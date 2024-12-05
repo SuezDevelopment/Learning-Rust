@@ -16,7 +16,43 @@ The API provides endpoints for:
 The application is structured as follows:
 
 * **Ollama Integration (`ollama.rs`):** Handles communication with the Ollama API for LLM interaction.  This module provides an abstraction layer for interacting with the LLM, allowing for easy switching between models if needed.
+  
+```
+    use ollama_rs::{
+        generation::{completion::request::GenerationRequest, options::GenerationOptions},
+        Ollama,
+    };
 
+
+    pub struct OllamaAI {
+        client: Ollama,
+    }
+
+    impl OllamaAI {
+        pub fn new() -> Self {
+            Self {
+                client: Ollama::default(),
+            }
+        }
+
+        pub async fn generate_text(
+            &self,
+            model: &str,
+            prompt: &str,
+            temperature: f32,
+            max_tokens: u32,
+        ) -> Result<String, Box<dyn std::error::Error>> {
+            let options = GenerationOptions::default().temperature(temperature).top_k(max_tokens);
+            let request = GenerationRequest::new(model.to_string(), prompt.to_string()).options(options);
+        
+            match self.client.generate(request).await {
+                Ok(response) => Ok(response.response),
+                Err(e) => Err(Box::new(e))
+            }
+        }
+        
+    }
+```
 * **PostgreSQL Integration:**  (Implementation details to be added).  Manages database connections and performs database operations.  This includes handling database connections, executing queries, and processing results.  Consideration is given to connection pooling for efficiency.
 
 * **API Endpoints:** (Implementation details to be added). Defines and implements the RESTful endpoints using a suitable framework (e.g., Actix Web). Each endpoint handles requests, interacts with the Ollama and PostgreSQL modules, and returns appropriate responses.
@@ -36,7 +72,7 @@ The application is structured as follows:
 
 
 
-Future Enhancements
-Implement robust authentication and authorization (JWT).
-Explore other LLMs beyond Llama 2.
-Add rate limiting to prevent abuse.
+### Future Enhancements
+* Implement robust authentication and authorization (JWT).
+* Explore other LLMs beyond Llama 2.
+* Add rate limiting to prevent abuse.
