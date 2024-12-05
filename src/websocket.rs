@@ -1,8 +1,13 @@
 use actix_web::{ web, Error, HttpRequest, HttpResponse };
 use actix_web_actors::ws;
-use actix::{ Actor, StreamHandler};
+use actix::{ Actor, StreamHandler, Addr, System, AsyncContext};
+use actix::prelude::*;
 
-use uuid::uuid;
+use actix_session::Session;
+
+use std::time::Duration;
+
+use uuid::Uuid;
 
 use serde::{ Deserialize, Serialize };
 use serde_json::json;
@@ -12,28 +17,30 @@ use chrono::{DateTime, Local};
 use crate::middleware::*;
 use crate::response::*;
 
+use crate::models::*;
+
 #[derive(Deserialize, Serialize)]
 struct WsMessage {
     action: String,
     data: serde_json::Value,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct WsConnection {
-    id: uuid::Uuid,
-    connected_at: std::time::SystemTime,
+    pub id: uuid::Uuid,
+    pub connected_at: std::time::SystemTime,
+    pub user: Option<User>,
+
 }
 
 
 impl WsConnection {
-    pub fn new() -> Self {
+    pub fn new(session: Session) -> Self {
+        let user = get_user_from_session(&session);
         Self {
             id: uuid::Uuid::new_v4(),
             connected_at: std::time::SystemTime::now(),
-            // client_info: None,
-            // message_count: 0,
-            // last_ping: std::time::SystemTime::now(),
-            // room: None,
+            user,
         }
     }
 
@@ -48,6 +55,28 @@ impl WsConnection {
         
         ctx.text(welcome_message.to_string());
     }
+
+    fn start_connection_timer(&self, ctx: &mut ws::WebsocketContext<Self>) {
+        ctx.run_interval(Duration::from_secs(1), |_act, ctx| {
+            let elapsed = std::time::SystemTime::now()
+                .duration_since(_act.connected_at)
+                .unwrap_or(Duration::from_secs(0));
+            
+            let timer_message = json!({
+                "action": "connection_time",
+                "data": {
+                    "seconds": elapsed.as_secs(),
+                    "formatted": format!("{}:{:02}:{:02}", 
+                        elapsed.as_secs() / 3600,
+                        (elapsed.as_secs() % 3600) / 60,
+                        elapsed.as_secs() % 60
+                    )
+                }
+            });
+            
+            ctx.text(timer_message.to_string());
+        });
+    }
 }
 
 impl Actor for WsConnection {
@@ -56,6 +85,7 @@ impl Actor for WsConnection {
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
     fn started(&mut self, ctx: &mut Self::Context) {
+        self.start_connection_timer(ctx);
         self.send_welcome_message(ctx);
     }
 
@@ -104,14 +134,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsConnection {
 
 pub async fn websocket_handler(
     req: HttpRequest,
-    stream: web::Payload
+    stream: web::Payload,
+    session: Session
 ) -> Result<HttpResponse, Error> {
     if let Some(auth_header) = req.headers().get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             if auth_str.starts_with("Bearer ") {
                 let token = &auth_str[7..];
                 if validate_token(token) {
-                    let connection = WsConnection::new();
+                    let connection = WsConnection::new(session);
+                    
                     let local_time: DateTime<Local> = connection.connected_at.into();
                     println!(
                         "New websocket connection established - ID: {} at: {}", 

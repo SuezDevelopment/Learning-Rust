@@ -48,6 +48,7 @@ impl Cache {
             }
         }
     }
+    
     pub fn get_value(&self, key: &str) -> RedisResult<Option<String>> {
         let result = self.client.get_connection()
             .and_then(|mut con| con.get(key));

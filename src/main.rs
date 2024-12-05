@@ -1,8 +1,6 @@
-use actix_web::{ web, App, Error, HttpServer, HttpRequest, HttpResponse, cookie::Key };
+use actix_web::{ web, App, HttpServer, HttpRequest, HttpResponse, cookie::Key };
 use actix_session::{ Session, SessionMiddleware, storage::CookieSessionStore };
-use ollama_rs::Ollama;
 
-// use std::error::Error;
 use dotenv::dotenv;
 use std::env;
 
@@ -26,11 +24,14 @@ use models::*;
 mod ollama;
 use ollama::*;
 
+mod postgres_db;
+use postgres_db::*;
+
 use chrono::{ DateTime, Utc };
 
 async fn greet(_req: HttpRequest, name: web::Path<String>, session: Session) -> HttpResponse {
-    if let Some(user) = get_user_from_session(&session) {
-    }
+    let _user = get_user_from_session(&session);
+
     HttpResponse::Ok().body(format!("Hello {}!", name))
 }
 
@@ -149,8 +150,15 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let redis_url = env::var("REMOTE_REDIS_URL").unwrap();
-    let redis_client = Cache::new(&redis_url).expect("Redis connection successful");
+    let redis_client = Cache::new(&redis_url).expect("Redis connection failed");
     let cache_data = web::Data::new(redis_client);
+
+    let postgresql_url = env::var("REMOTE_POSTGRESQL_URL").unwrap();
+    let db = PostgresDb::new(&postgresql_url)
+        .await
+        .expect("Failed to connect to database");;
+
+    let db_pool = web::Data::new(db);
 
     HttpServer::new(move || {
         App::new()
@@ -162,6 +170,13 @@ async fn main() -> std::io::Result<()> {
             // .service(fs::Files::new("/", "./client/dist").index_file("index.html"))
             // .service(fs::Files::new("/assets", "./client/dist/assets").index_file(".*"))
             .app_data(cache_data.clone())
+            .app_data(db_pool.clone())
+            
+            .default_service(
+                web::route().to(|| async {
+                    response_not_found("route not found")
+                })
+            )
 
             .route("/health", web::get().to(health_check))
 

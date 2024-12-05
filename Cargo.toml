@@ -9,6 +9,7 @@ serde = { version = "1.0", features = ["derive"] }
 redis = { version = "0.27.6", features = ["native-tls","tokio-comp"] }
 tokio-native-tls = "0.3.1"
 native-tls = "0.2.12"
+postgres-native-tls = "0.5.0"
 serde_json = "1.0"
 log = "0.4"
 env_logger = "0.11.5"
@@ -17,6 +18,7 @@ solana-sdk = "2.1.4"
 solana-client = "2.1.4"
 solana-program = "2.1.4"
 tokio = { version = "1.42", features = ["full"] }
+tokio-postgres = "0.7"
 actix-files = "0.6"
 tokio-tungstenite = "0.24.0"
 futures = "0.3"

@@ -21,4 +21,4 @@ health:
 .PHONY: health
 
 sock:
-	wscat -c ws://127.0.0.1:9080/ws/ --protocol 13 -H "Authorization: Bearer vali_token"
+	wscat -c ws://127.0.0.1:9080/api/ws/ --protocol 13 -H "Authorization: Bearer valid_token"
