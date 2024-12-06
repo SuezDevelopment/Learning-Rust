@@ -27,6 +27,9 @@ use ollama::*;
 mod postgres_db;
 use postgres_db::*;
 
+mod azure_storage;
+use azure_storage::*;
+
 use chrono::{ DateTime, Utc };
 
 async fn greet(_req: HttpRequest, name: web::Path<String>, session: Session) -> HttpResponse {
@@ -162,6 +165,14 @@ async fn main() -> std::io::Result<()> {
 
     let db_pool = web::Data::new(db);
 
+    let azure_account = env::var("STORAGE_ACCOUNT").unwrap();
+    let access_key = env::var("STORAGE_ACCESS_KEY").unwrap();
+    let azure_client = AzureStorage::new(azure_account, access_key);
+
+
+    let azure_storage_pool = web::Data::new(azure_client);
+
+
     HttpServer::new(move || {
         App::new()
             .wrap(
@@ -173,6 +184,7 @@ async fn main() -> std::io::Result<()> {
             // .service(fs::Files::new("/assets", "./client/dist/assets").index_file(".*"))
             .app_data(cache_data.clone())
             .app_data(db_pool.clone())
+            .app_data(azure_storage_pool.clone())
 
             .default_service(
                 web::route().to(|| async {
