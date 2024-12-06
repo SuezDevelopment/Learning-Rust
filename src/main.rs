@@ -70,6 +70,8 @@ async fn health_check() -> HttpResponse {
 struct PromptRequest {
     model: String,
     prompt: String,
+    temperature: f32, 
+    max_tokens: u32
 }
 
 async fn generate_prompt(req: web::Json<PromptRequest>)  -> HttpResponse {
@@ -78,8 +80,8 @@ async fn generate_prompt(req: web::Json<PromptRequest>)  -> HttpResponse {
     let response = ollama_client.generate_text(
         &req.model,
         &req.prompt,
-        50.0,
-        32,
+        Some(req.temperature),
+        Some(req.max_tokens),
     ).await;
 
     match response {
@@ -171,7 +173,7 @@ async fn main() -> std::io::Result<()> {
             // .service(fs::Files::new("/assets", "./client/dist/assets").index_file(".*"))
             .app_data(cache_data.clone())
             .app_data(db_pool.clone())
-            
+
             .default_service(
                 web::route().to(|| async {
                     response_not_found("route not found")
